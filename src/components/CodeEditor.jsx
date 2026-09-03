@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback } from 'react';
+import { useRef, useEffect, useState, useCallback } from 'react';
 import Editor from '@monaco-editor/react';
 
 const LANGUAGES = [
@@ -23,13 +23,26 @@ export default function CodeEditor({
     language, 
     onLanguageChange, 
     editorRef: externalEditorRef,
-    userId,
+    user,
 }) {
     const editorRef = useRef(null);
     const monacoRef = useRef(null);
     const isRemoteChange = useRef(false);
     const lastSnippetRef = useRef(null);
     const changeDebounceTimer = useRef(null);
+    const typingTimer = useRef(null);
+    const [activeEditorUser, setActiveEditorUser] = useState(null);
+
+    // Keep always-fresh references to props so callbacks never suffer from stale closures
+    const socketRef = useRef(socket);
+    const roomIdRef = useRef(roomId);
+    const languageRef = useRef(language);
+    const userRef = useRef(user);
+
+    useEffect(() => { socketRef.current = socket; }, [socket]);
+    useEffect(() => { roomIdRef.current = roomId; }, [roomId]);
+    useEffect(() => { languageRef.current = language; }, [language]);
+    useEffect(() => { userRef.current = user; }, [user]);
 
     const handleEditorDidMount = useCallback((editor, monaco) => {
         editorRef.current = editor;
@@ -79,30 +92,40 @@ export default function CodeEditor({
         });
         monaco.editor.setTheme('codecollab-light');
 
-        // Setup EOL to LF to prevent character offset mismatches
+        // Setup EOL to LF to prevent character offset mismatches across OSs
         editor.getModel()?.setEOL(monaco.editor.EndOfLineSequence.LF);
 
         // Listen for local text edits and emit via Socket.io
         const disposable = editor.onDidChangeModelContent(() => {
-            if (isRemoteChange.current || !socket?.connected) return;
+            if (isRemoteChange.current) return;
+
+            const s = socketRef.current;
+            if (!s || !s.connected) return;
+
+            // Broadcast typing presence
+            s.emit('code:typing', {
+                roomId: roomIdRef.current,
+                user: userRef.current,
+            });
 
             const currentCode = editor.getValue();
 
-            // Slightly debounce emit to optimize network throughput (50ms)
+            // Debounce code sync to maintain ultra-fast responsive typing without flooding socket
             clearTimeout(changeDebounceTimer.current);
             changeDebounceTimer.current = setTimeout(() => {
-                socket.emit('code:change', {
-                    roomId,
+                s.emit('code:change', {
+                    roomId: roomIdRef.current,
                     code: currentCode,
-                    language,
+                    language: languageRef.current,
+                    user: userRef.current,
                 });
-            }, 50);
+            }, 60);
         });
 
         return () => disposable.dispose();
-    }, [socket, roomId, language, externalEditorRef]);
+    }, [externalEditorRef]);
 
-    // Listen for remote code updates and room init
+    // Listen for remote code updates, room init, and typing awareness
     useEffect(() => {
         if (!socket) return;
 
@@ -119,7 +142,14 @@ export default function CodeEditor({
 
         const onCodeUpdate = (data) => {
             if (!editorRef.current || !data) return;
-            if (data.updatedBy === userId) return;
+            if (data.updatedBy === userRef.current?.userId) return;
+
+            // Show active typing presence
+            if (data.user) {
+                setActiveEditorUser(data.user);
+                clearTimeout(typingTimer.current);
+                typingTimer.current = setTimeout(() => setActiveEditorUser(null), 2500);
+            }
 
             const editor = editorRef.current;
             const currentVal = editor.getValue();
@@ -139,16 +169,25 @@ export default function CodeEditor({
             }
         };
 
+        const onCodeTyping = (data) => {
+            if (!data?.user || data.user.userId === userRef.current?.userId) return;
+            setActiveEditorUser(data.user);
+            clearTimeout(typingTimer.current);
+            typingTimer.current = setTimeout(() => setActiveEditorUser(null), 2500);
+        };
+
         socket.on('room:init', onRoomInit);
         socket.on('code:update', onCodeUpdate);
+        socket.on('code:typing', onCodeTyping);
 
         return () => {
             socket.off('room:init', onRoomInit);
             socket.off('code:update', onCodeUpdate);
+            socket.off('code:typing', onCodeTyping);
         };
-    }, [socket, userId, language, onLanguageChange]);
+    }, [socket, language, onLanguageChange]);
 
-    // Handle initial boilerplate snippet insertion when problem or language changes
+    // Handle boilerplate snippet insertion when problem or language changes
     useEffect(() => {
         if (problem?.codeSnippets && editorRef.current) {
             const lang = LANGUAGES.find((l) => l.value === language);
@@ -167,20 +206,35 @@ export default function CodeEditor({
                     isRemoteChange.current = false;
 
                     // Broadcast new snippet to room
-                    if (socket?.connected) {
-                        socket.emit('code:change', {
-                            roomId,
+                    const s = socketRef.current;
+                    if (s?.connected) {
+                        s.emit('code:change', {
+                            roomId: roomIdRef.current,
                             code: cleanCode,
                             language,
+                            user: userRef.current,
                         });
                     }
                 }
             }
         }
-    }, [problem, language, socket, roomId]);
+    }, [problem, language]);
 
     return (
         <div className="flex-1 w-full relative h-full">
+            {/* Live Typing Presence Badge */}
+            {activeEditorUser && (
+                <div className="absolute top-3 right-6 z-30 flex items-center gap-2.5 px-3 py-1.5 rounded-full bg-white/95 border border-white/60 shadow-md backdrop-blur-md animate-fade-in pointer-events-none">
+                    <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ backgroundColor: activeEditorUser.userColor || '#2563EB' }} />
+                        <span className="relative inline-flex rounded-full h-2 w-2" style={{ backgroundColor: activeEditorUser.userColor || '#2563EB' }} />
+                    </span>
+                    <span className="text-xs font-bold tracking-wide" style={{ color: activeEditorUser.userColor || '#2563EB' }}>
+                        {activeEditorUser.userName} is typing...
+                    </span>
+                </div>
+            )}
+
             <Editor
                 height="100%"
                 language={language}

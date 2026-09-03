@@ -5,7 +5,6 @@
 
 class RoomManager {
     constructor() {
-        // roomId -> { code, language, problem, whiteboard, chatHistory: [], participants: Map(socketId -> userData) }
         this.rooms = new Map();
     }
 
@@ -30,7 +29,6 @@ class RoomManager {
     deleteRoomIfEmpty(roomId) {
         const room = this.rooms.get(roomId);
         if (room && room.participants.size === 0) {
-            // Keep room in memory for 1 hour in case user refreshes
             setTimeout(() => {
                 const r = this.rooms.get(roomId);
                 if (r && r.participants.size === 0) {
@@ -88,7 +86,7 @@ export function registerRoomHandlers(io, socket) {
     });
 
     // Real-time Collaborative Code Editing
-    socket.on('code:change', ({ roomId, code, language, cursor }) => {
+    socket.on('code:change', ({ roomId, code, language, cursor, user }) => {
         const targetRoom = roomId || currentRoomId;
         if (!targetRoom) return;
 
@@ -96,47 +94,65 @@ export function registerRoomHandlers(io, socket) {
         if (typeof code === 'string') room.code = code;
         if (language) room.language = language;
 
+        const activeUser = user || currentUser;
+
         socket.to(targetRoom).emit('code:update', {
             code: room.code,
             language: room.language,
-            updatedBy: currentUser?.userId,
+            updatedBy: activeUser?.userId,
+            user: activeUser,
             cursor,
+        });
+    });
+
+    // Code typing presence broadcast
+    socket.on('code:typing', ({ roomId, user }) => {
+        const targetRoom = roomId || currentRoomId;
+        if (!targetRoom) return;
+
+        socket.to(targetRoom).emit('code:typing', {
+            user: user || currentUser,
+            timestamp: Date.now(),
         });
     });
 
     // Cursor movement awareness
-    socket.on('code:cursor', ({ roomId, cursor }) => {
+    socket.on('code:cursor', ({ roomId, cursor, user }) => {
         const targetRoom = roomId || currentRoomId;
-        if (!targetRoom || !currentUser) return;
+        if (!targetRoom) return;
 
         socket.to(targetRoom).emit('code:cursor', {
             cursor,
-            user: currentUser,
+            user: user || currentUser,
         });
     });
 
     // Problem sync (when a user imports a LeetCode problem)
-    socket.on('problem:sync', ({ roomId, problem }) => {
+    socket.on('problem:sync', ({ roomId, problem, user }) => {
         const targetRoom = roomId || currentRoomId;
         if (!targetRoom) return;
 
         const room = roomManager.getOrCreateRoom(targetRoom);
         room.problem = problem;
 
-        socket.to(targetRoom).emit('problem:update', problem);
+        socket.to(targetRoom).emit('problem:update', {
+            problem,
+            user: user || currentUser,
+        });
     });
 
     // Chat messaging
-    socket.on('chat:send', ({ roomId, text }) => {
+    socket.on('chat:send', ({ roomId, text, user }) => {
         const targetRoom = roomId || currentRoomId;
-        if (!targetRoom || !text?.trim() || !currentUser) return;
+        if (!targetRoom || !text?.trim()) return;
 
+        const sender = user || currentUser;
         const room = roomManager.getOrCreateRoom(targetRoom);
         const message = {
             id: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-            userId: currentUser.userId,
-            userName: currentUser.userName,
-            userColor: currentUser.userColor,
+            userId: sender?.userId || 'anon',
+            userName: sender?.userName || 'Anonymous',
+            userColor: sender?.userColor || '#2563EB',
             text: text.trim(),
             timestamp: Date.now(),
         };
@@ -149,18 +165,21 @@ export function registerRoomHandlers(io, socket) {
         io.to(targetRoom).emit('chat:message', message);
     });
 
-    // Real-time Whiteboard Drawing Sync
-    socket.on('whiteboard:update', ({ roomId, elements, appState }) => {
+    // Real-time Whiteboard Drawing Sync with live drawer info
+    socket.on('whiteboard:update', ({ roomId, elements, appState, user }) => {
         const targetRoom = roomId || currentRoomId;
         if (!targetRoom) return;
 
         const room = roomManager.getOrCreateRoom(targetRoom);
         room.whiteboard = { elements, appState };
 
+        const drawer = user || currentUser;
+
         socket.to(targetRoom).emit('whiteboard:update', {
             elements,
             appState,
-            fromUserId: currentUser?.userId,
+            fromUserId: drawer?.userId,
+            user: drawer,
         });
     });
 
@@ -176,17 +195,27 @@ export function registerRoomHandlers(io, socket) {
         });
     });
 
-    // Voice status toggle
-    socket.on('voice:toggle', ({ roomId, inVoice, isMuted }) => {
+    // Voice status toggle & incoming voice call notification
+    socket.on('voice:toggle', ({ roomId, inVoice, isMuted, user }) => {
         const targetRoom = roomId || currentRoomId;
-        if (!targetRoom || !currentUser) return;
+        if (!targetRoom) return;
 
         const room = roomManager.getOrCreateRoom(targetRoom);
         const participant = room.participants.get(socket.id);
+        const activeUser = user || currentUser;
+
         if (participant) {
             participant.inVoice = Boolean(inVoice);
             participant.isMuted = Boolean(isMuted);
             io.to(targetRoom).emit('participants:update', Array.from(room.participants.values()));
+
+            // If user joined voice, notify others in room to join
+            if (inVoice) {
+                socket.to(targetRoom).emit('voice:incoming', {
+                    user: activeUser,
+                    roomId: targetRoom,
+                });
+            }
         }
     });
 

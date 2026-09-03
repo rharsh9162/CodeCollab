@@ -125,7 +125,7 @@ export default function App() {
 }
 
 function MainApp({ user, signOut, onShowLanding }) {
-  const [roomId] = useState(() => getRoomFromUrl() || generateRoomId());
+  const [roomId, setRoomId] = useState(() => getRoomFromUrl() || generateRoomId());
   const [problem, setProblem] = useState(null);
   const [loading, setLoading] = useState(false);
   const [language, setLanguage] = useState('python');
@@ -135,6 +135,8 @@ function MainApp({ user, signOut, onShowLanding }) {
   const [executionResults, setExecutionResults] = useState([]);
   const [isRunning, setIsRunning] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarTab, setSidebarTab] = useState('chat');
+  const [unreadMessages, setUnreadMessages] = useState(0);
   const [socket, setSocket] = useState(null);
   const editorRef = useRef(null);
   const problemLoadedRef = useRef(false);
@@ -170,6 +172,14 @@ function MainApp({ user, signOut, onShowLanding }) {
     }
   }, []);
 
+  const handleJoinRoom = useCallback((newRoomId) => {
+    if (!newRoomId || newRoomId === roomId) return;
+    setRoomId(newRoomId);
+    setProblem(null);
+    setExecutionResults([]);
+    addToast(`Switched to room: ${newRoomId}`, 'success');
+  }, [roomId, addToast]);
+
   // Connect & join room via Socket.io
   useEffect(() => {
     const s = getSocket();
@@ -179,9 +189,10 @@ function MainApp({ user, signOut, onShowLanding }) {
       s.emit('room:join', { roomId, user: userIdentity });
     };
 
-    const onProblemUpdate = (remoteProblem) => {
-      if (remoteProblem) {
-        setProblem(remoteProblem);
+    const onProblemUpdate = (data) => {
+      const p = data?.problem || data;
+      if (p) {
+        setProblem(p);
       }
     };
 
@@ -194,9 +205,41 @@ function MainApp({ user, signOut, onShowLanding }) {
       }
     };
 
+    const onVoiceIncoming = ({ user: caller }) => {
+      toast(`📞 ${caller?.userName || 'A peer'} started a voice call in this room!`, {
+        action: {
+          label: 'Join Call',
+          onClick: () => {
+            setSidebarTab('voice');
+            setSidebarOpen(true);
+          },
+        },
+        duration: 8000,
+      });
+    };
+
+    const onChatMessage = (msg) => {
+      if (!sidebarOpen && msg.userId !== userIdentity.userId) {
+        setUnreadMessages((prev) => prev + 1);
+        toast(`💬 ${msg.userName}: ${msg.text.slice(0, 35)}${msg.text.length > 35 ? '...' : ''}`, {
+          action: {
+            label: 'Open',
+            onClick: () => {
+              setSidebarTab('chat');
+              setSidebarOpen(true);
+              setUnreadMessages(0);
+            },
+          },
+          duration: 4000,
+        });
+      }
+    };
+
     s.on('connect', onConnect);
     s.on('problem:update', onProblemUpdate);
     s.on('room:init', onRoomInit);
+    s.on('voice:incoming', onVoiceIncoming);
+    s.on('chat:message', onChatMessage);
 
     if (s.connected) {
       onConnect();
@@ -206,8 +249,10 @@ function MainApp({ user, signOut, onShowLanding }) {
       s.off('connect', onConnect);
       s.off('problem:update', onProblemUpdate);
       s.off('room:init', onRoomInit);
+      s.off('voice:incoming', onVoiceIncoming);
+      s.off('chat:message', onChatMessage);
     };
-  }, [roomId, userIdentity]);
+  }, [roomId, userIdentity, sidebarOpen]);
 
   const handleImport = useCallback(async (slug) => {
     setLoading(true);
@@ -362,6 +407,7 @@ function MainApp({ user, signOut, onShowLanding }) {
         user={userIdentity}
         onSignOut={signOut}
         onShowLanding={onShowLanding}
+        onJoinRoom={handleJoinRoom}
       />
 
       <div className="flex flex-1 min-h-0 min-w-0 overflow-hidden relative p-4 gap-2">
@@ -427,7 +473,7 @@ function MainApp({ user, signOut, onShowLanding }) {
                   language={language} 
                   onLanguageChange={setLanguage} 
                   editorRef={editorRef} 
-                  userId={userIdentity.userId} 
+                  user={userIdentity}
                 />
               </div>
               <div className="h-[35%] min-h-[250px] border-t border-white/50 bg-white/60 backdrop-blur-md flex flex-col shrink-0">
@@ -436,7 +482,7 @@ function MainApp({ user, signOut, onShowLanding }) {
             </div>
             
             <div className={`absolute inset-0 bg-white/50 backdrop-blur-md ${activeRightTab === 'whiteboard' ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}>
-                <Whiteboard roomId={roomId} socket={socket} />
+                <Whiteboard roomId={roomId} socket={socket} user={userIdentity} />
             </div>
           </div>
         </div>
@@ -445,7 +491,12 @@ function MainApp({ user, signOut, onShowLanding }) {
           socket={socket}
           roomId={roomId}
           isOpen={sidebarOpen}
-          onToggle={() => setSidebarOpen(!sidebarOpen)}
+          initialTab={sidebarTab}
+          unreadCount={unreadMessages}
+          onToggle={() => {
+            setSidebarOpen(!sidebarOpen);
+            if (!sidebarOpen) setUnreadMessages(0);
+          }}
           userId={userIdentity.userId}
           userName={userIdentity.userName}
           userColor={userIdentity.userColor}
