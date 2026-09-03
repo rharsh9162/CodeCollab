@@ -6,7 +6,7 @@ import App from './App.jsx'
 import { AuthProvider } from './contexts/AuthContext.jsx'
 import { KeyRound, ExternalLink } from 'lucide-react'
 
-const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
+const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY || 'pk_test_c3VubnktZGFzc2llLTYyOTMuY2xlcmsuYWNjb3VudHMuZGV2JA'
 
 function MissingClerkKeyNotice() {
   return (
