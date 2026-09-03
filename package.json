@@ -9,7 +9,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "server": "node server/server.js",
-    "start": "node server/server.js & vite"
+    "start": "node server/server.js"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

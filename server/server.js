@@ -6,7 +6,16 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const PORT = 3001;
+const PORT = process.env.PORT || 3001;
+
+// Root & Health check endpoints for Render
+app.get('/', (req, res) => {
+    res.json({ service: 'CodeCollab Backend', status: 'healthy', ws: true });
+});
+
+app.get('/health', (req, res) => {
+    res.status(200).send('OK');
+});
 
 // LeetCode GraphQL API proxy
 app.get('/api/problem/:titleSlug', async (req, res) => {
