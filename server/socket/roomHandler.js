@@ -97,7 +97,14 @@ export function registerRoomHandlers(io, socket) {
         if (!targetRoom) return;
 
         const room = roomManager.getOrCreateRoom(targetRoom);
-        if (typeof code === 'string') room.code = code;
+        
+        // Protect existing room code from being erased by empty initial payloads
+        if (typeof code === 'string') {
+            if (code.trim() === '' && room.code && room.code.trim().length > 0) {
+                return;
+            }
+            room.code = code;
+        }
         if (language) room.language = language;
 
         const activeUser = user || currentUser;
@@ -177,7 +184,14 @@ export function registerRoomHandlers(io, socket) {
         if (!targetRoom) return;
 
         const room = roomManager.getOrCreateRoom(targetRoom);
-        room.whiteboard = { elements, appState };
+        
+        // Protect existing whiteboard from being wiped out by empty initial payloads
+        if (Array.isArray(elements)) {
+            if (elements.length === 0 && room.whiteboard?.elements?.length > 0) {
+                return;
+            }
+            room.whiteboard = { elements, appState };
+        }
 
         const drawer = user || currentUser;
 

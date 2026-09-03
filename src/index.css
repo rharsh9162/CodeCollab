@@ -93,3 +93,46 @@
     @apply w-1.5 mx-1 my-4 bg-slate-200/50 hover:bg-primary rounded-full cursor-col-resize transition-colors shrink-0 z-20 backdrop-blur-sm;
   }
 }
+
+/* High-Contrast, Crystal-Clear Monaco Code Suggestion Area */
+.monaco-editor .suggest-widget {
+  background: #FFFFFF !important;
+  border: 1px solid #CBD5E1 !important;
+  box-shadow: 0 12px 28px -4px rgba(15, 23, 42, 0.15), 0 4px 12px -2px rgba(15, 23, 42, 0.08) !important;
+  border-radius: 8px !important;
+  color: #0F172A !important;
+}
+
+.monaco-editor .suggest-widget .monaco-list .monaco-list-row {
+  color: #0F172A !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
+}
+
+.monaco-editor .suggest-widget .monaco-list .monaco-list-row.focused {
+  background-color: #EFF6FF !important;
+  color: #1E40AF !important;
+}
+
+.monaco-editor .suggest-widget .monaco-highlighted-label {
+  color: #0F172A !important;
+}
+
+.monaco-editor .suggest-widget .monaco-highlighted-label .highlight {
+  color: #2563EB !important;
+  font-weight: 800 !important;
+}
+
+.monaco-editor .suggest-widget .suggest-status-bar {
+  background-color: #F8FAFC !important;
+  border-top: 1px solid #E2E8F0 !important;
+  color: #475569 !important;
+  font-size: 11px !important;
+  font-weight: 500 !important;
+}
+
+.monaco-editor .suggest-widget .details {
+  border-left: 1px solid #E2E8F0 !important;
+  background-color: #FAFAFA !important;
+  color: #1E293B !important;
+}

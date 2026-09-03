@@ -32,6 +32,7 @@ export default function CodeEditor({
     const changeDebounceTimer = useRef(null);
     const typingTimer = useRef(null);
     const [activeEditorUser, setActiveEditorUser] = useState(null);
+    const hasRoomCodeInitialized = useRef(false);
 
     // Keep always-fresh references to props so callbacks never suffer from stale closures
     const socketRef = useRef(socket);
@@ -84,10 +85,22 @@ export default function CodeEditor({
                 'scrollbarSlider.hoverBackground': '#00000020',
                 'scrollbarSlider.activeBackground': '#00000030',
                 'editorWidget.background': '#FFFFFF',
-                'editorWidget.border': '#E5E7EB',
+                'editorWidget.border': '#CBD5E1',
+                'editorWidget.foreground': '#0F172A',
                 'editorSuggestWidget.background': '#FFFFFF',
-                'editorSuggestWidget.border': '#E5E7EB',
-                'editorSuggestWidget.selectedBackground': '#F3F4F6',
+                'editorSuggestWidget.border': '#CBD5E1',
+                'editorSuggestWidget.foreground': '#0F172A',
+                'editorSuggestWidget.selectedForeground': '#1E40AF',
+                'editorSuggestWidget.selectedBackground': '#EFF6FF',
+                'editorSuggestWidget.highlightForeground': '#2563EB',
+                'editorSuggestWidget.focusHighlightForeground': '#1D4ED8',
+                'editorHoverWidget.background': '#FFFFFF',
+                'editorHoverWidget.border': '#CBD5E1',
+                'editorHoverWidget.foreground': '#0F172A',
+                'list.hoverBackground': '#F8FAFC',
+                'list.activeSelectionBackground': '#EFF6FF',
+                'list.activeSelectionForeground': '#1E40AF',
+                'list.focusHighlightForeground': '#2563EB',
                 'editorStickyScroll.background': '#FFFFFF',
                 'editorStickyScrollHover.background': '#F3F4F6',
                 'editorStickyScroll.shadow': '#00000010',
@@ -104,6 +117,9 @@ export default function CodeEditor({
 
             const s = socketRef.current;
             if (!s || !s.connected) return;
+
+            // Mark that local user has made custom edits
+            hasRoomCodeInitialized.current = true;
 
             // Broadcast typing presence
             s.emit('code:typing', {
@@ -133,10 +149,15 @@ export default function CodeEditor({
         if (!socket) return;
 
         const onRoomInit = (data) => {
-            if (editorRef.current && data?.code && data.code.trim()) {
-                isRemoteChange.current = true;
-                editorRef.current.setValue(data.code);
-                isRemoteChange.current = false;
+            if (data?.code && data.code.trim()) {
+                hasRoomCodeInitialized.current = true;
+                if (editorRef.current) {
+                    isRemoteChange.current = true;
+                    editorRef.current.setValue(data.code);
+                    isRemoteChange.current = false;
+                }
+                const slug = data?.problem?.titleSlug || problem?.titleSlug || 'custom';
+                lastSnippetRef.current = `${slug}-${data.language || language}`;
             }
             if (data?.language && data.language !== language && onLanguageChange) {
                 onLanguageChange(data.language);
@@ -161,6 +182,7 @@ export default function CodeEditor({
             const pos = editor.getPosition();
             const scrollTop = editor.getScrollTop();
 
+            hasRoomCodeInitialized.current = true;
             isRemoteChange.current = true;
             editor.setValue(data.code);
             if (pos) editor.setPosition(pos);
@@ -188,10 +210,15 @@ export default function CodeEditor({
             socket.off('code:update', onCodeUpdate);
             socket.off('code:typing', onCodeTyping);
         };
-    }, [socket, language, onLanguageChange]);
+    }, [socket, language, onLanguageChange, problem]);
 
     // Handle boilerplate snippet insertion when problem or language changes
     useEffect(() => {
+        // If room already has user-written or synchronized code, DO NOT overwrite it with boilerplate!
+        if (hasRoomCodeInitialized.current && editorRef.current?.getValue().trim()) {
+            return;
+        }
+
         if (problem?.codeSnippets && editorRef.current) {
             const lang = LANGUAGES.find((l) => l.value === language);
             const snippet = problem.codeSnippets.find(
@@ -204,19 +231,12 @@ export default function CodeEditor({
                     lastSnippetRef.current = snippetKey;
                     const cleanCode = snippet.code.replace(/\r\n/g, '\n').trimEnd() + '\n';
                     
-                    isRemoteChange.current = true;
-                    editorRef.current.setValue(cleanCode);
-                    isRemoteChange.current = false;
-
-                    // Broadcast new snippet to room
-                    const s = socketRef.current;
-                    if (s?.connected) {
-                        s.emit('code:change', {
-                            roomId: roomIdRef.current,
-                            code: cleanCode,
-                            language,
-                            user: userRef.current,
-                        });
+                    const currentVal = editorRef.current.getValue().trim();
+                    const isDefault = Object.values(DEFAULT_CODE).some(c => c.trim() === currentVal);
+                    if (!currentVal || isDefault) {
+                        isRemoteChange.current = true;
+                        editorRef.current.setValue(cleanCode);
+                        isRemoteChange.current = false;
                     }
                 }
             }

@@ -205,6 +205,7 @@ function MainApp({ user, signOut, onShowLanding }) {
 
     const onRoomInit = (data) => {
       if (data?.problem) {
+        problemLoadedRef.current = true;
         setProblem(data.problem);
       }
       if (data?.language) {
@@ -342,12 +343,17 @@ function MainApp({ user, signOut, onShowLanding }) {
     }
   }, [addToast, roomId]);
 
-  // Auto-load problem from URL on mount
+  // Auto-load problem from URL on mount only if room does not already have an active problem
   useEffect(() => {
     const slug = getProblemFromUrl();
     if (slug && !problemLoadedRef.current) {
-      problemLoadedRef.current = true;
-      handleImport(slug);
+      const timer = setTimeout(() => {
+        if (!problemLoadedRef.current) {
+          problemLoadedRef.current = true;
+          handleImport(slug);
+        }
+      }, 500);
+      return () => clearTimeout(timer);
     }
   }, [handleImport]);
 
