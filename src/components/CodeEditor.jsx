@@ -106,7 +106,9 @@ export default function CodeEditor({ roomId, problem, language, onLanguageChange
         const ydoc = new Y.Doc();
         ydocRef.current = ydoc;
 
-        const wsUrl = import.meta.env.VITE_WS_URL || `ws://${window.location.hostname}:3001`;
+        const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+        const defaultWs = isLocal ? `ws://${window.location.hostname}:3001` : 'wss://codecollab-backend-a4w0.onrender.com';
+        const wsUrl = import.meta.env.VITE_WS_URL || defaultWs;
         const provider = new WebsocketProvider(wsUrl, `codecollab-${roomId}`, ydoc);
         providerRef.current = provider;
 

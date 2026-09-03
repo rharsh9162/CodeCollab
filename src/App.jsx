@@ -168,8 +168,12 @@ function MainApp({ user, signOut, onShowLanding }) {
     }
   }, []);
 
-  const API_BASE = import.meta.env.VITE_API_URL || '';
-  const WS_BASE = import.meta.env.VITE_WS_URL || `ws://${window.location.hostname}:3001`;
+  const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+  const DEFAULT_API_URL = isLocal ? '' : 'https://codecollab-backend-a4w0.onrender.com';
+  const DEFAULT_WS_URL = isLocal ? `ws://${window.location.hostname}:3001` : 'wss://codecollab-backend-a4w0.onrender.com';
+
+  const API_BASE = import.meta.env.VITE_API_URL || DEFAULT_API_URL;
+  const WS_BASE = import.meta.env.VITE_WS_URL || DEFAULT_WS_URL;
 
   const handleImport = useCallback(async (slug) => {
     setLoading(true);
