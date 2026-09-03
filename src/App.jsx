@@ -265,6 +265,19 @@ function MainApp({ user, signOut, onShowLanding }) {
     return runCodeExecution(code, lang, stdin);
   };
 
+  const getCurrentSnippet = useCallback(() => {
+    if (!problem?.codeSnippets) return null;
+    const LANG_SLUGS = {
+      python: 'python3', javascript: 'javascript', typescript: 'typescript',
+      java: 'java', cpp: 'cpp', c: 'c', csharp: 'csharp', go: 'golang',
+      rust: 'rust', ruby: 'ruby', swift: 'swift', kotlin: 'kotlin',
+    };
+    const slug = LANG_SLUGS[language];
+    return problem.codeSnippets.find(
+      (s) => s.langSlug === slug || s.lang.toLowerCase().includes(language)
+    )?.code || null;
+  }, [problem, language]);
+
   const handleRunCode = useCallback(async () => {
     const code = getEditorCode();
     if (!code.trim()) { addToast('No code to execute!', 'error'); return; }
