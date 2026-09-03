@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { Code2, PenTool, Play, Send, BookOpen, Loader2, PhoneCall, MessageSquare } from 'lucide-react';
 import { useAuth } from './contexts/AuthContext';
 import AuthPage from './components/AuthPage';
@@ -254,48 +255,42 @@ function MainApp({ user, signOut, onShowLanding }) {
       setGlobalActivity({
         type: 'voice',
         user: caller,
-        text: `${caller?.userName || 'A collaborator'} started a voice call`,
-      });
-      clearTimeout(activityTimer.current);
-      activityTimer.current = setTimeout(() => setGlobalActivity(null), 4500);
-
-      toast(`📞 ${caller?.userName || 'A peer'} started a voice call in this room!`, {
+        text: 'started a voice call',
         action: {
           label: 'Join Call',
           onClick: () => {
             setSidebarTab('voice');
             setSidebarOpen(true);
+            setGlobalActivity(null);
           },
         },
-        duration: 8000,
       });
+      clearTimeout(activityTimer.current);
+      activityTimer.current = setTimeout(() => setGlobalActivity(null), 8000);
     };
 
     // Global Presence: Chat Message
     const onChatMessage = (msg) => {
       if (msg.userId !== userIdentity.userId) {
+        if (!sidebarOpenRef.current) {
+          setUnreadMessages((prev) => prev + 1);
+        }
         setGlobalActivity({
           type: 'chat',
           user: { userName: msg.userName, userColor: msg.userColor },
-          text: `${msg.userName}: ${msg.text.slice(0, 30)}${msg.text.length > 30 ? '...' : ''}`,
+          text: msg.text.slice(0, 35) + (msg.text.length > 35 ? '...' : ''),
+          action: {
+            label: 'Reply',
+            onClick: () => {
+              setSidebarTab('chat');
+              setSidebarOpen(true);
+              setUnreadMessages(0);
+              setGlobalActivity(null);
+            },
+          },
         });
         clearTimeout(activityTimer.current);
-        activityTimer.current = setTimeout(() => setGlobalActivity(null), 3500);
-
-        if (!sidebarOpenRef.current) {
-          setUnreadMessages((prev) => prev + 1);
-          toast(`💬 ${msg.userName}: ${msg.text.slice(0, 35)}${msg.text.length > 35 ? '...' : ''}`, {
-            action: {
-              label: 'Open',
-              onClick: () => {
-                setSidebarTab('chat');
-                setSidebarOpen(true);
-                setUnreadMessages(0);
-              },
-            },
-            duration: 4000,
-          });
-        }
+        activityTimer.current = setTimeout(() => setGlobalActivity(null), 4500);
       }
     };
 
@@ -485,29 +480,52 @@ function MainApp({ user, signOut, onShowLanding }) {
         onJoinRoom={handleJoinRoom}
       />
 
-      {/* Global Live Activity Pill */}
-      {globalActivity && (
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2.5 px-4 py-2 rounded-full bg-white/95 border border-white/70 shadow-2xl backdrop-blur-xl animate-slide-up pointer-events-none transition-all">
-          {globalActivity.type === 'typing' && (
-            <span className="relative flex h-2.5 w-2.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ backgroundColor: globalActivity.user?.userColor || '#2563EB' }} />
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5" style={{ backgroundColor: globalActivity.user?.userColor || '#2563EB' }} />
-            </span>
-          )}
-          {globalActivity.type === 'drawing' && (
-            <PenTool size={14} className="text-secondary animate-bounce" />
-          )}
-          {globalActivity.type === 'voice' && (
-            <PhoneCall size={14} className="text-secondary animate-pulse" />
-          )}
-          {globalActivity.type === 'chat' && (
-            <MessageSquare size={14} className="text-primary animate-pulse" />
-          )}
-          <span className="text-xs font-extrabold tracking-wide" style={{ color: globalActivity.user?.userColor || '#2563EB' }}>
-            {globalActivity.text}
-          </span>
-        </div>
-      )}
+      {/* Unified Dynamic Island Notification Capsule */}
+      <AnimatePresence>
+        {globalActivity && (
+          <motion.div 
+            initial={{ y: -24, opacity: 0, scale: 0.96 }}
+            animate={{ y: 0, opacity: 1, scale: 1 }}
+            exit={{ y: -24, opacity: 0, scale: 0.96 }}
+            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+            className="fixed top-3.5 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-2.5 px-4 py-2 rounded-full bg-slate-900/95 text-white border border-slate-700/60 shadow-[0_12px_36px_rgba(0,0,0,0.3)] backdrop-blur-2xl pointer-events-auto select-none"
+          >
+            {globalActivity.type === 'typing' && (
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ backgroundColor: globalActivity.user?.userColor || '#3B82F6' }} />
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5" style={{ backgroundColor: globalActivity.user?.userColor || '#3B82F6' }} />
+              </span>
+            )}
+            {globalActivity.type === 'drawing' && (
+              <PenTool size={13} className="text-emerald-400 animate-bounce" />
+            )}
+            {globalActivity.type === 'voice' && (
+              <PhoneCall size={13} className="text-blue-400 animate-pulse" />
+            )}
+            {globalActivity.type === 'chat' && (
+              <MessageSquare size={13} className="text-purple-400" />
+            )}
+            
+            <div className="flex items-center gap-1.5 text-xs font-medium tracking-tight">
+              <span className="font-bold" style={{ color: globalActivity.user?.userColor || '#60A5FA' }}>
+                {globalActivity.user?.userName || 'Collaborator'}
+              </span>
+              <span className="text-slate-200">
+                {globalActivity.text}
+              </span>
+            </div>
+
+            {globalActivity.action && (
+              <button
+                onClick={globalActivity.action.onClick}
+                className="ml-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-blue-600 hover:bg-blue-500 text-white transition-all shadow-sm active:scale-95 cursor-pointer"
+              >
+                {globalActivity.action.label}
+              </button>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div className="flex flex-1 min-h-0 min-w-0 overflow-hidden relative p-4 gap-2">
         {/* Left Panel: Problem Description */}
@@ -602,8 +620,8 @@ function MainApp({ user, signOut, onShowLanding }) {
         />
       </div>
       
-      <Toaster position="bottom-right" theme="light" toastOptions={{
-          style: { background: 'rgba(255,255,255,0.8)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.6)', color: '#0F172A', boxShadow: '0 4px 20px rgba(0,0,0,0.05)' },
+      <Toaster position="top-center" theme="light" toastOptions={{
+          style: { background: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(16px)', border: '1px solid rgba(226,232,240,0.8)', color: '#0F172A', fontWeight: 600, boxShadow: '0 8px 30px rgba(0,0,0,0.08)' },
       }} />
     </div>
   );

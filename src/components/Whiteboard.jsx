@@ -10,12 +10,10 @@ const ExcalidrawComponent = lazy(() =>
 
 export default function Whiteboard({ roomId, socket, user }) {
     const [excalidrawAPI, setExcalidrawAPI] = useState(null);
-    const [activeDrawer, setActiveDrawer] = useState(null);
     const isRemoteUpdate = useRef(false);
     const lastSentElements = useRef(null);
     const hasReceivedInitialState = useRef(false);
     const throttleTimer = useRef(null);
-    const drawerTimer = useRef(null);
 
     const userRef = useRef(user);
     useEffect(() => { userRef.current = user; }, [user]);
@@ -42,13 +40,6 @@ export default function Whiteboard({ roomId, socket, user }) {
 
         const handleUpdate = (data) => {
             if (!data || !data.elements) return;
-
-            // Show live drawing presence badge if someone else is drawing
-            if (data.user && data.fromUserId !== userRef.current?.userId) {
-                setActiveDrawer(data.user);
-                clearTimeout(drawerTimer.current);
-                drawerTimer.current = setTimeout(() => setActiveDrawer(null), 2500);
-            }
 
             isRemoteUpdate.current = true;
             excalidrawAPI.updateScene({
@@ -104,15 +95,6 @@ export default function Whiteboard({ roomId, socket, user }) {
 
     return (
         <div className="flex-1 relative w-full h-full bg-background">
-            {/* Live Drawing Presence Badge */}
-            {activeDrawer && (
-                <div className="absolute top-4 left-4 z-30 flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-white/95 border border-white/60 shadow-md backdrop-blur-md animate-fade-in pointer-events-none">
-                    <PenTool size={13} className="text-secondary animate-bounce" />
-                    <span className="text-xs font-bold" style={{ color: activeDrawer.userColor || '#10B981' }}>
-                        {activeDrawer.userName} is drawing...
-                    </span>
-                </div>
-            )}
 
             <Suspense
                 fallback={

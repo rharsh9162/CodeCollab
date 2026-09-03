@@ -45,8 +45,6 @@ export default function CodeEditor({
     const isRemoteChange = useRef(false);
     const lastSnippetRef = useRef(null);
     const changeDebounceTimer = useRef(null);
-    const typingTimer = useRef(null);
-    const [activeEditorUser, setActiveEditorUser] = useState(null);
     const hasRoomCodeInitialized = useRef(false);
 
     // Keep always-fresh references to props so callbacks never suffer from stale closures
@@ -183,13 +181,6 @@ export default function CodeEditor({
             if (!editorRef.current || !data) return;
             if (data.updatedBy === userRef.current?.userId) return;
 
-            // Show active typing presence
-            if (data.user) {
-                setActiveEditorUser(data.user);
-                clearTimeout(typingTimer.current);
-                typingTimer.current = setTimeout(() => setActiveEditorUser(null), 2500);
-            }
-
             const editor = editorRef.current;
             const currentVal = editor.getValue();
             if (currentVal === data.code) return;
@@ -209,21 +200,12 @@ export default function CodeEditor({
             }
         };
 
-        const onCodeTyping = (data) => {
-            if (!data?.user || data.user.userId === userRef.current?.userId) return;
-            setActiveEditorUser(data.user);
-            clearTimeout(typingTimer.current);
-            typingTimer.current = setTimeout(() => setActiveEditorUser(null), 2500);
-        };
-
         socket.on('room:init', onRoomInit);
         socket.on('code:update', onCodeUpdate);
-        socket.on('code:typing', onCodeTyping);
 
         return () => {
             socket.off('room:init', onRoomInit);
             socket.off('code:update', onCodeUpdate);
-            socket.off('code:typing', onCodeTyping);
         };
     }, [socket, language, onLanguageChange, problem]);
 
@@ -260,19 +242,6 @@ export default function CodeEditor({
 
     return (
         <div className="flex-1 w-full relative h-full">
-            {/* Live Typing Presence Badge */}
-            {activeEditorUser && (
-                <div className="absolute top-3 right-6 z-30 flex items-center gap-2.5 px-3 py-1.5 rounded-full bg-white/95 border border-white/60 shadow-md backdrop-blur-md animate-fade-in pointer-events-none">
-                    <span className="relative flex h-2 w-2">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ backgroundColor: activeEditorUser.userColor || '#2563EB' }} />
-                        <span className="relative inline-flex rounded-full h-2 w-2" style={{ backgroundColor: activeEditorUser.userColor || '#2563EB' }} />
-                    </span>
-                    <span className="text-xs font-bold tracking-wide" style={{ color: activeEditorUser.userColor || '#2563EB' }}>
-                        {activeEditorUser.userName} is typing...
-                    </span>
-                </div>
-            )}
-
             <Editor
                 height="100%"
                 language={language}
