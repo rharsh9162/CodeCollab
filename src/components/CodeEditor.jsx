@@ -16,6 +16,21 @@ const LANGUAGES = [
     { label: 'Kotlin', value: 'kotlin', slug: 'kotlin' },
 ];
 
+const DEFAULT_CODE = {
+    python: '# Write your solution here\n',
+    javascript: '// Write your solution here\n',
+    typescript: '// Write your solution here\n',
+    cpp: '// Write your solution here\n',
+    c: '// Write your solution here\n',
+    java: '// Write your solution here\n',
+    csharp: '// Write your solution here\n',
+    go: '// Write your solution here\n',
+    rust: '// Write your solution here\n',
+    ruby: '# Write your solution here\n',
+    swift: '// Write your solution here\n',
+    kotlin: '// Write your solution here\n',
+};
+
 export default function CodeEditor({ 
     socket,
     roomId, 
