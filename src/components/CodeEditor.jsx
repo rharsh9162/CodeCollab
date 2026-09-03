@@ -88,6 +88,9 @@ export default function CodeEditor({
                 'editorSuggestWidget.background': '#FFFFFF',
                 'editorSuggestWidget.border': '#E5E7EB',
                 'editorSuggestWidget.selectedBackground': '#F3F4F6',
+                'editorStickyScroll.background': '#FFFFFF',
+                'editorStickyScrollHover.background': '#F3F4F6',
+                'editorStickyScroll.shadow': '#00000010',
             },
         });
         monaco.editor.setTheme('codecollab-light');
@@ -276,6 +279,7 @@ export default function CodeEditor({
                     autoClosingBrackets: 'languageDefined',
                     autoClosingQuotes: 'languageDefined',
                     trimAutoWhitespace: true,
+                    stickyScroll: { enabled: false },
                 }}
                 loading={
                     <div className="flex items-center justify-center h-full w-full">

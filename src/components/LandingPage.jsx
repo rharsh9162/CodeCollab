@@ -19,65 +19,72 @@ export default function LandingPage({ onGetStarted }) {
     };
 
     const techPills = [
-        { icon: Globe, name: "WebRTC", desc: "Sub-40ms P2P Audio & Data" },
-        { icon: Layers, name: "Yjs CRDT", desc: "Conflict-Free Sync" },
-        { icon: Cpu, name: "Docker Engine", desc: "Isolated Linux Sandbox" },
+        { icon: Zap, name: "Socket.io", desc: "Sub-20ms WebSocket & Polling" },
+        { icon: Cpu, name: "Judge0 CE", desc: "Python 3.12, Node 18, C++ GCC" },
         { icon: Code2, name: "Monaco Editor", desc: "VS Code Core Engine" },
-        { icon: Zap, name: "Vite Bundler", desc: "Sub-second HMR" },
-        { icon: Activity, name: "WebSockets", desc: "Signaling Fallback" },
-        { icon: GitBranch, name: "LeetCode API", desc: "Official Test Driver" },
-        { icon: PenTool, name: "Excalidraw", desc: "Vector Whiteboard" },
+        { icon: Globe, name: "WebRTC Audio", desc: "P2P Voice with OpenRelay TURN" },
+        { icon: Shield, name: "Clerk Auth", desc: "Unified OAuth & Session Identity" },
+        { icon: Activity, name: "Live Presence", desc: "Global Typing & Drawing Banners" },
+        { icon: GitBranch, name: "LeetCode API", desc: "Official GraphQL Test Driver" },
+        { icon: PenTool, name: "Excalidraw", desc: "Vector Architecture Whiteboard" },
     ];
 
     const codeSnippets = {
-        python: `# Two Sum - Hash Map approach O(n)
-def two_sum(nums: list[int], target: int) -> list[int]:
-    visited = {}
-    for idx, val in enumerate(nums):
-        diff = target - val
-        if diff in visited:
-            return [visited[diff], idx]
-        visited[val] = idx
-    return []
+        python: `# Two City Scheduling - Python 3.12 (PEP 585 Generics)
+class Solution:
+    def twoCitySchedCost(self, costs: list[list[int]]) -> int:
+        costs.sort(key=lambda x: x[0] - x[1])
+        total_cost = 0
+        n = len(costs) // 2
+        for i in range(n):
+            total_cost += costs[i][0] + costs[i + n][1]
+        return total_cost
 
-# Executed in sandbox container
-# Status: 3/3 Test cases passed (34ms)`,
-        typescript: `// Real-time Peer Cursor Synchronization
-export function handleCursorStream(roomId: string, cursor: CursorState) {
-  const channel = WebRTC.getChannel(roomId);
-  channel.send({
-    type: 'CURSOR_DELTA',
-    uid: cursor.userId,
-    line: cursor.line,
-    column: cursor.column,
-    t: performance.now(),
+# Executed in Judge0 sandboxed runtime
+# Status: 3/3 Test cases passed (18ms)`,
+        typescript: `// Real-Time Socket.io Room Orchestration
+socket.on('code:change', ({ roomId, code, language, user }) => {
+  socket.to(roomId).emit('code:update', {
+    code,
+    language,
+    updatedBy: user.userId,
+    user,
   });
-} // Latency: 18ms peer-to-peer`,
-        rust: `// Fast Conflict-Free Document Synchronization
-pub fn apply_yjs_update(doc: &mut Doc, binary_delta: &[u8]) -> Result<(), SyncErr> {
-    let mut transaction = doc.transact_mut();
-    transaction.apply_update(binary_delta)?;
-    log::info!("State converged with zero locks");
-    Ok(())
-}`
+}); // Sub-15ms WebSocket propagation`,
+        cpp: `// C++ Solution with GCC 9.2
+#include <vector>
+#include <algorithm>
+using namespace std;
+
+class Solution {
+public:
+    int twoCitySchedCost(vector<vector<int>>& costs) {
+        sort(costs.begin(), costs.end(), [](const auto& a, const auto& b) {
+            return (a[0] - a[1]) < (b[0] - b[1]);
+        });
+        int total = 0, n = costs.size() / 2;
+        for (int i = 0; i < n; ++i) total += costs[i][0] + costs[i + n][1];
+        return total;
+    }
+};`
     };
 
     const faqs = [
         {
-            q: "How does the real-time synchronization work without lag?",
-            a: "CodeCollab uses Conflict-free Replicated Data Types (CRDTs) built on Yjs. Changes propagate directly peer-to-peer over WebRTC data channels with high-performance WebSocket fallback, resolving concurrent edits deterministically without locking."
+            q: "How does the real-time collaboration work across devices?",
+            a: "CodeCollab uses a high-performance Socket.io architecture with automatic HTTP long-polling fallback. Code changes, cursor positions, whiteboard vectors, and chat messages synchronize instantly between laptops, tablets, and phones without connection drops."
         },
         {
-            q: "How is code execution isolated and secured?",
-            a: "Every execution request is dispatched to an isolated, ephemeral Linux container sandbox with strict CPU, memory, and runtime limits. Network isolation prevents unauthorized access while allowing standard algorithm execution."
+            q: "How is code execution handled securely?",
+            a: "All code submissions are dispatched to isolated Judge0 Community Edition sandboxes running modern runtimes: Python 3.12 (with PEP 585 generic type support), Node.js 18, TypeScript 5, C++ (GCC), and Java 17, complete with memory limits and execution timeouts."
         },
         {
-            q: "Can I collaborate without creating an account?",
-            a: "Yes. Anyone can open an instant room without signing up. Just share the room link with teammates or candidates to pair-program immediately."
+            q: "How do distinct user accounts work in shared rooms?",
+            a: "Powered by Clerk authentication, developers can sign in from their own device with Google, GitHub, or email. Joining a room with a Room ID retains each developer's distinct identity, avatar, and color-coded presence."
         },
         {
             q: "How does the LeetCode problem integration work?",
-            a: "You can search or import any LeetCode problem slug directly into the workspace. The official problem description, sample test cases, and starter code snippet are imported automatically for interactive testing."
+            a: "Search or enter any LeetCode problem slug (e.g. two-sum). CodeCollab automatically fetches the official problem description, starter code snippets, and example test cases via GraphQL, wrapping them with our automated test runner driver."
         }
     ];
 
@@ -321,7 +328,7 @@ pub fn apply_yjs_update(doc: &mut Doc, binary_delta: &[u8]) -> Result<(), SyncEr
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        {/* Large Tile: CRDT Sync with SVG Network Diagram */}
+                        {/* Large Tile: Socket.io Real-Time Engine */}
                         <motion.div 
                             initial={{ opacity: 0, y: 25 }}
                             whileInView={{ opacity: 1, y: 0 }}
@@ -331,23 +338,23 @@ pub fn apply_yjs_update(doc: &mut Doc, binary_delta: &[u8]) -> Result<(), SyncEr
                         >
                             <div>
                                 <div className="h-11 w-11 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center mb-6 border border-blue-100">
-                                    <Layers size={22} strokeWidth={1.75} />
+                                    <Zap size={22} strokeWidth={1.75} />
                                 </div>
                                 <h3 className="text-2xl font-bold text-slate-950 mb-2">
-                                    Conflict-Free Replicated Data Types (CRDT)
+                                    Real-Time Socket.io Multi-User Engine
                                 </h3>
                                 <p className="text-slate-600 text-base max-w-xl leading-relaxed">
-                                    Powered by Yjs. Edits converge automatically without locking or network contention. Multiple engineers can refactor the same function simultaneously with zero overwrite conflicts.
+                                    Engineered with low-latency bidirectional WebSocket pipelines and automatic HTTP long-polling fallback. Code changes, typing indicators, and whiteboard vectors broadcast instantaneously in under 15ms.
                                 </p>
                             </div>
 
                             {/* SVG Network Convergence Graphic */}
                             <div className="mt-8 rounded-2xl bg-slate-50 border border-slate-200/80 p-5">
                                 <div className="flex items-center justify-between text-xs text-slate-500 mb-3 font-mono border-b border-slate-200/60 pb-2">
-                                    <span>P2P Consensus Topology</span>
+                                    <span>Socket.io Room Pipeline</span>
                                     <span className="text-emerald-600 font-semibold flex items-center gap-1">
                                         <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                                        State Converged
+                                        Live Synced
                                     </span>
                                 </div>
                                 
@@ -355,25 +362,25 @@ pub fn apply_yjs_update(doc: &mut Doc, binary_delta: &[u8]) -> Result<(), SyncEr
                                     <div className="flex flex-col items-center gap-1.5 p-2 rounded-xl bg-white border border-slate-200 shadow-sm">
                                         <Laptop size={18} className="text-blue-600" />
                                         <span className="text-xs font-bold text-slate-800">Peer A</span>
-                                        <span className="text-[10px] font-mono text-slate-500">12ms · SF</span>
+                                        <span className="text-[10px] font-mono text-slate-500">12ms · Client</span>
                                     </div>
                                     <div className="flex flex-col items-center justify-center">
                                         <div className="w-full border-t-2 border-dashed border-blue-300 relative flex items-center justify-center">
                                             <span className="absolute px-2 py-0.5 rounded bg-blue-600 text-white text-[9px] font-mono font-bold">
-                                                Yjs Sync
+                                                Socket.io 4.8
                                             </span>
                                         </div>
                                     </div>
                                     <div className="flex flex-col items-center gap-1.5 p-2 rounded-xl bg-white border border-slate-200 shadow-sm">
                                         <Laptop size={18} className="text-blue-600" />
                                         <span className="text-xs font-bold text-slate-800">Peer B</span>
-                                        <span className="text-[10px] font-mono text-slate-500">18ms · London</span>
+                                        <span className="text-[10px] font-mono text-slate-500">15ms · Client</span>
                                     </div>
                                 </div>
                             </div>
                         </motion.div>
 
-                        {/* Tile 2: Secure Sandbox with System Telemetry */}
+                        {/* Tile 2: Judge0 Cloud Sandbox */}
                         <motion.div 
                             initial={{ opacity: 0, y: 25 }}
                             whileInView={{ opacity: 1, y: 0 }}
@@ -385,19 +392,19 @@ pub fn apply_yjs_update(doc: &mut Doc, binary_delta: &[u8]) -> Result<(), SyncEr
                                 <div className="h-11 w-11 rounded-xl bg-slate-800 text-blue-400 flex items-center justify-center mb-6 border border-slate-700">
                                     <Cpu size={22} strokeWidth={1.75} />
                                 </div>
-                                <h3 className="text-2xl font-bold mb-2">Docker Sandbox</h3>
+                                <h3 className="text-2xl font-bold mb-2">Judge0 Sandbox</h3>
                                 <p className="text-slate-400 text-sm leading-relaxed">
-                                    Isolated Linux containers execute Python, JavaScript, TypeScript, C++, Java, and Go with strict resource quotas.
+                                    Cloud-isolated compilers executing Python 3.12 (with PEP 585 generics), Node.js 18, TypeScript 5, C++ (GCC), and Java 17 with automated testcase harness evaluation.
                                 </p>
                             </div>
 
                             <div className="mt-8 font-mono text-xs rounded-xl bg-slate-900 p-3.5 border border-slate-800 space-y-2">
                                 <div className="flex items-center justify-between text-[11px] text-slate-500 border-b border-slate-800 pb-1.5">
-                                    <span>Container Telemetry</span>
-                                    <span className="text-emerald-400">RAM: 16.4MB / 128MB</span>
+                                    <span>Judge0 CE Telemetry</span>
+                                    <span className="text-emerald-400">Exit Code: 0</span>
                                 </div>
-                                <div className="text-slate-300">$ gcc -O2 solution.cpp -o run</div>
-                                <div className="text-slate-500">Execution time: 0.04s · CPU: 0.2%</div>
+                                <div className="text-slate-300">$ python3.12 solution.py</div>
+                                <div className="text-slate-500">Execution time: 0.02s · Status: Accepted</div>
                                 <div className="text-emerald-400 font-semibold">Test Output: 3/3 Passed ✓</div>
                             </div>
                         </motion.div>
@@ -420,7 +427,7 @@ pub fn apply_yjs_update(doc: &mut Doc, binary_delta: &[u8]) -> Result<(), SyncEr
                                 </p>
 
                                 <div className="flex gap-2 mb-4">
-                                    {['python', 'typescript', 'rust'].map((lang) => (
+                                    {['python', 'typescript', 'cpp'].map((lang) => (
                                         <button
                                             key={lang}
                                             onClick={() => setActiveLang(lang)}
