@@ -211,32 +211,56 @@ export default function CodeEditor({
 
     // Handle boilerplate snippet insertion when problem or language changes
     useEffect(() => {
-        // If room already has user-written or synchronized code, DO NOT overwrite it with boilerplate!
-        if (hasRoomCodeInitialized.current && editorRef.current?.getValue().trim()) {
+        if (!editorRef.current) return;
+
+        let newCode = null;
+        const snippetKey = `${problem?.titleSlug || 'custom'}-${language}`;
+
+        // If we've already inserted this exact problem+language snippet, do nothing
+        if (lastSnippetRef.current === snippetKey) {
             return;
         }
 
-        if (problem?.codeSnippets && editorRef.current) {
+        if (problem?.codeSnippets) {
             const lang = LANGUAGES.find((l) => l.value === language);
             const snippet = problem.codeSnippets.find(
                 (s) => s.langSlug === lang?.slug || s.lang.toLowerCase().includes(language)
             );
-
             if (snippet) {
-                const snippetKey = `${problem.titleSlug || 'custom'}-${language}`;
-                if (lastSnippetRef.current !== snippetKey) {
-                    lastSnippetRef.current = snippetKey;
-                    const cleanCode = snippet.code.replace(/\r\n/g, '\n').trimEnd() + '\n';
-                    
-                    const currentVal = editorRef.current.getValue().trim();
-                    const isDefault = Object.values(DEFAULT_CODE).some(c => c.trim() === currentVal);
-                    if (!currentVal || isDefault) {
-                        isRemoteChange.current = true;
-                        editorRef.current.setValue(cleanCode);
-                        isRemoteChange.current = false;
-                    }
-                }
+                newCode = snippet.code.replace(/\r\n/g, '\n').trimEnd() + '\n';
             }
+        }
+
+        // Fallback to default code if no problem snippet exists
+        if (newCode === null) {
+            newCode = DEFAULT_CODE[language] || '';
+        }
+
+        // Always update code on language/problem change unless it matches current
+        const currentVal = editorRef.current.getValue().trim();
+        const newCodeTrimmed = newCode.trim();
+
+        if (currentVal !== newCodeTrimmed) {
+            lastSnippetRef.current = snippetKey;
+            
+            isRemoteChange.current = true;
+            editorRef.current.setValue(newCode);
+            isRemoteChange.current = false;
+            
+            // Broadcast the new boilerplate so peers also see the change
+            hasRoomCodeInitialized.current = true;
+            const s = socketRef.current;
+            if (s && s.connected) {
+                s.emit('code:change', {
+                    roomId: roomIdRef.current,
+                    code: newCode,
+                    language: languageRef.current,
+                    user: userRef.current,
+                });
+            }
+        } else {
+            // Even if the code is identical, update the ref so we don't keep trying
+            lastSnippetRef.current = snippetKey;
         }
     }, [problem, language]);
 
