@@ -63,6 +63,10 @@ export function registerRoomHandlers(io, socket) {
         socket.join(roomId);
 
         const room = roomManager.getOrCreateRoom(roomId);
+        
+        // Prevent duplicate 'user:joined' spam if user is already connected in this room
+        const isAlreadyInRoom = Array.from(room.participants.values()).some(p => p.userId === currentUser.userId);
+
         room.participants.set(socket.id, currentUser);
 
         // Send full initial state to the joining user
@@ -75,11 +79,13 @@ export function registerRoomHandlers(io, socket) {
             participants: Array.from(room.participants.values()),
         });
 
-        // Notify other room members
-        socket.to(roomId).emit('user:joined', {
-            user: currentUser,
-            timestamp: Date.now(),
-        });
+        // Notify other room members ONLY if genuinely a new participant
+        if (!isAlreadyInRoom) {
+            socket.to(roomId).emit('user:joined', {
+                user: currentUser,
+                timestamp: Date.now(),
+            });
+        }
 
         // Broadcast updated participants list to everyone in the room
         io.to(roomId).emit('participants:update', Array.from(room.participants.values()));
@@ -226,11 +232,15 @@ export function registerRoomHandlers(io, socket) {
                 const room = roomManager.getRoom(roomName);
                 if (room) {
                     room.participants.delete(socket.id);
-                    socket.to(roomName).emit('user:left', {
-                        userId: currentUser?.userId,
-                        userName: currentUser?.userName,
-                        timestamp: Date.now(),
-                    });
+                    
+                    const userStillPresent = Array.from(room.participants.values()).some(p => p.userId === currentUser?.userId);
+                    if (!userStillPresent && currentUser) {
+                        socket.to(roomName).emit('user:left', {
+                            userId: currentUser.userId,
+                            userName: currentUser.userName,
+                            timestamp: Date.now(),
+                        });
+                    }
                     socket.to(roomName).emit('participants:update', Array.from(room.participants.values()));
                     roomManager.deleteRoomIfEmpty(roomName);
                 }

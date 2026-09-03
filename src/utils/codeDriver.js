@@ -101,7 +101,8 @@ export function wrapWithDriver(userCode, language, methodName, paramCount) {
 
     switch (language) {
         case 'python':
-            return `from typing import List, Optional, Tuple, Dict, Set
+            return `from __future__ import annotations
+from typing import List, Optional, Tuple, Dict, Set, Any, Union
 import json, sys
 
 ${userCode}

@@ -10,12 +10,12 @@ const judge0Client = axios.create({
 });
 
 export const JUDGE0_LANG_MAP = {
-    python: 71,     // Python (3.8.1)
-    javascript: 63, // JavaScript (Node.js 12.14.0)
-    typescript: 74, // TypeScript (3.7.4)
+    python: 100,    // Python (3.12.5) - Supports PEP 585 generics (list[int], list[list[int]], etc.)
+    javascript: 93, // JavaScript (Node.js 18.15.0)
+    typescript: 94, // TypeScript (5.0.3)
     cpp: 54,        // C++ (GCC 9.2.0)
     c: 50,          // C (GCC 9.2.0)
-    java: 62,       // Java (OpenJDK 13.0.1)
+    java: 91,       // Java (JDK 17.0.6)
     csharp: 51,     // C# (Mono 6.6.0.161)
     go: 60,         // Go (1.13.5)
     rust: 73,       // Rust (1.40.0)

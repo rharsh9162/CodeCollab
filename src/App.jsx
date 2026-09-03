@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { Code2, PenTool, Play, Send, BookOpen, Loader2 } from 'lucide-react';
+import { Code2, PenTool, Play, Send, BookOpen, Loader2, PhoneCall, MessageSquare } from 'lucide-react';
 import { useAuth } from './contexts/AuthContext';
 import AuthPage from './components/AuthPage';
 import LandingPage from './components/LandingPage';
@@ -137,9 +137,16 @@ function MainApp({ user, signOut, onShowLanding }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarTab, setSidebarTab] = useState('chat');
   const [unreadMessages, setUnreadMessages] = useState(0);
+  const [globalActivity, setGlobalActivity] = useState(null);
   const [socket, setSocket] = useState(null);
   const editorRef = useRef(null);
   const problemLoadedRef = useRef(false);
+  const activityTimer = useRef(null);
+  const sidebarOpenRef = useRef(sidebarOpen);
+
+  useEffect(() => {
+    sidebarOpenRef.current = sidebarOpen;
+  }, [sidebarOpen]);
 
   const { panelWidth, startDrag } = useResizer(35);
 
@@ -205,7 +212,52 @@ function MainApp({ user, signOut, onShowLanding }) {
       }
     };
 
+    // Global Presence: Code Typing
+    const onCodeTyping = ({ user: activeUser }) => {
+      if (!activeUser || activeUser.userId === userIdentity.userId) return;
+      setGlobalActivity({
+        type: 'typing',
+        user: activeUser,
+        text: `${activeUser.userName} is typing code...`,
+      });
+      clearTimeout(activityTimer.current);
+      activityTimer.current = setTimeout(() => setGlobalActivity(null), 2500);
+    };
+
+    // Global Presence: Code Updated
+    const onCodeUpdate = (data) => {
+      if (!data?.user || data.user.userId === userIdentity.userId) return;
+      setGlobalActivity({
+        type: 'typing',
+        user: data.user,
+        text: `${data.user.userName} edited code`,
+      });
+      clearTimeout(activityTimer.current);
+      activityTimer.current = setTimeout(() => setGlobalActivity(null), 2500);
+    };
+
+    // Global Presence: Whiteboard Drawing
+    const onWhiteboardUpdate = (data) => {
+      if (!data?.user || data.user.userId === userIdentity.userId) return;
+      setGlobalActivity({
+        type: 'drawing',
+        user: data.user,
+        text: `${data.user.userName} is drawing on whiteboard...`,
+      });
+      clearTimeout(activityTimer.current);
+      activityTimer.current = setTimeout(() => setGlobalActivity(null), 2500);
+    };
+
+    // Global Presence: Voice Call
     const onVoiceIncoming = ({ user: caller }) => {
+      setGlobalActivity({
+        type: 'voice',
+        user: caller,
+        text: `${caller?.userName || 'A collaborator'} started a voice call`,
+      });
+      clearTimeout(activityTimer.current);
+      activityTimer.current = setTimeout(() => setGlobalActivity(null), 4500);
+
       toast(`📞 ${caller?.userName || 'A peer'} started a voice call in this room!`, {
         action: {
           label: 'Join Call',
@@ -218,26 +270,40 @@ function MainApp({ user, signOut, onShowLanding }) {
       });
     };
 
+    // Global Presence: Chat Message
     const onChatMessage = (msg) => {
-      if (!sidebarOpen && msg.userId !== userIdentity.userId) {
-        setUnreadMessages((prev) => prev + 1);
-        toast(`💬 ${msg.userName}: ${msg.text.slice(0, 35)}${msg.text.length > 35 ? '...' : ''}`, {
-          action: {
-            label: 'Open',
-            onClick: () => {
-              setSidebarTab('chat');
-              setSidebarOpen(true);
-              setUnreadMessages(0);
-            },
-          },
-          duration: 4000,
+      if (msg.userId !== userIdentity.userId) {
+        setGlobalActivity({
+          type: 'chat',
+          user: { userName: msg.userName, userColor: msg.userColor },
+          text: `${msg.userName}: ${msg.text.slice(0, 30)}${msg.text.length > 30 ? '...' : ''}`,
         });
+        clearTimeout(activityTimer.current);
+        activityTimer.current = setTimeout(() => setGlobalActivity(null), 3500);
+
+        if (!sidebarOpenRef.current) {
+          setUnreadMessages((prev) => prev + 1);
+          toast(`💬 ${msg.userName}: ${msg.text.slice(0, 35)}${msg.text.length > 35 ? '...' : ''}`, {
+            action: {
+              label: 'Open',
+              onClick: () => {
+                setSidebarTab('chat');
+                setSidebarOpen(true);
+                setUnreadMessages(0);
+              },
+            },
+            duration: 4000,
+          });
+        }
       }
     };
 
     s.on('connect', onConnect);
     s.on('problem:update', onProblemUpdate);
     s.on('room:init', onRoomInit);
+    s.on('code:typing', onCodeTyping);
+    s.on('code:update', onCodeUpdate);
+    s.on('whiteboard:update', onWhiteboardUpdate);
     s.on('voice:incoming', onVoiceIncoming);
     s.on('chat:message', onChatMessage);
 
@@ -249,10 +315,13 @@ function MainApp({ user, signOut, onShowLanding }) {
       s.off('connect', onConnect);
       s.off('problem:update', onProblemUpdate);
       s.off('room:init', onRoomInit);
+      s.off('code:typing', onCodeTyping);
+      s.off('code:update', onCodeUpdate);
+      s.off('whiteboard:update', onWhiteboardUpdate);
       s.off('voice:incoming', onVoiceIncoming);
       s.off('chat:message', onChatMessage);
     };
-  }, [roomId, userIdentity, sidebarOpen]);
+  }, [roomId, userIdentity]);
 
   const handleImport = useCallback(async (slug) => {
     setLoading(true);
@@ -409,6 +478,30 @@ function MainApp({ user, signOut, onShowLanding }) {
         onShowLanding={onShowLanding}
         onJoinRoom={handleJoinRoom}
       />
+
+      {/* Global Live Activity Pill */}
+      {globalActivity && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2.5 px-4 py-2 rounded-full bg-white/95 border border-white/70 shadow-2xl backdrop-blur-xl animate-slide-up pointer-events-none transition-all">
+          {globalActivity.type === 'typing' && (
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ backgroundColor: globalActivity.user?.userColor || '#2563EB' }} />
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5" style={{ backgroundColor: globalActivity.user?.userColor || '#2563EB' }} />
+            </span>
+          )}
+          {globalActivity.type === 'drawing' && (
+            <PenTool size={14} className="text-secondary animate-bounce" />
+          )}
+          {globalActivity.type === 'voice' && (
+            <PhoneCall size={14} className="text-secondary animate-pulse" />
+          )}
+          {globalActivity.type === 'chat' && (
+            <MessageSquare size={14} className="text-primary animate-pulse" />
+          )}
+          <span className="text-xs font-extrabold tracking-wide" style={{ color: globalActivity.user?.userColor || '#2563EB' }}>
+            {globalActivity.text}
+          </span>
+        </div>
+      )}
 
       <div className="flex flex-1 min-h-0 min-w-0 overflow-hidden relative p-4 gap-2">
         {/* Left Panel: Problem Description */}
