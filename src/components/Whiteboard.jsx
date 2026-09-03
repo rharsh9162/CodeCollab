@@ -8,7 +8,7 @@ const ExcalidrawComponent = lazy(() =>
     }))
 );
 
-export default function Whiteboard({ roomId, socket, user }) {
+export default function Whiteboard({ roomId, socket, user, isRoomSynced }) {
     const [excalidrawAPI, setExcalidrawAPI] = useState(null);
     const isRemoteUpdate = useRef(false);
     const lastSentElements = useRef(null);
@@ -59,7 +59,7 @@ export default function Whiteboard({ roomId, socket, user }) {
 
     // Send local changes to room (throttled)
     const handleChange = useCallback((elements, appState) => {
-        if (isRemoteUpdate.current || !socket?.connected) return;
+        if (isRemoteUpdate.current || !socket?.connected || !isRoomSynced) return;
 
         // Guard: do not emit an empty initial board before receiving room state
         if (!hasReceivedInitialState.current && (!elements || elements.length === 0)) {
@@ -91,7 +91,7 @@ export default function Whiteboard({ roomId, socket, user }) {
             },
             user: userRef.current,
         });
-    }, [socket, roomId]);
+    }, [socket, roomId, isRoomSynced]);
 
     return (
         <div className="flex-1 relative w-full h-full bg-background">

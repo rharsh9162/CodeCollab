@@ -39,6 +39,7 @@ export default function CodeEditor({
     onLanguageChange, 
     editorRef: externalEditorRef,
     user,
+    isRoomSynced,
 }) {
     const editorRef = useRef(null);
     const monacoRef = useRef(null);
@@ -211,7 +212,7 @@ export default function CodeEditor({
 
     // Handle boilerplate snippet insertion when problem or language changes
     useEffect(() => {
-        if (!editorRef.current) return;
+        if (!editorRef.current || !isRoomSynced) return;
 
         let newCode = null;
         const snippetKey = `${problem?.titleSlug || 'custom'}-${language}`;
@@ -262,7 +263,7 @@ export default function CodeEditor({
             // Even if the code is identical, update the ref so we don't keep trying
             lastSnippetRef.current = snippetKey;
         }
-    }, [problem, language]);
+    }, [problem, language, isRoomSynced]);
 
     return (
         <div className="flex-1 w-full relative h-full">

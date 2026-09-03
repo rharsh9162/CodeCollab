@@ -140,6 +140,7 @@ function MainApp({ user, signOut, onShowLanding }) {
   const [unreadMessages, setUnreadMessages] = useState(0);
   const [globalActivity, setGlobalActivity] = useState(null);
   const [socket, setSocket] = useState(null);
+  const [isRoomSynced, setIsRoomSynced] = useState(false);
   const editorRef = useRef(null);
   const problemLoadedRef = useRef(false);
   const activityTimer = useRef(null);
@@ -194,6 +195,7 @@ function MainApp({ user, signOut, onShowLanding }) {
     setSocket(s);
 
     const onConnect = () => {
+      setIsRoomSynced(false);
       s.emit('room:join', { roomId, user: userIdentity });
     };
 
@@ -212,6 +214,7 @@ function MainApp({ user, signOut, onShowLanding }) {
       if (data?.language) {
         setLanguage(data.language);
       }
+      setIsRoomSynced(true);
     };
 
     // Global Presence: Code Typing
@@ -591,6 +594,7 @@ function MainApp({ user, signOut, onShowLanding }) {
                   onLanguageChange={setLanguage} 
                   editorRef={editorRef} 
                   user={userIdentity}
+                  isRoomSynced={isRoomSynced}
                 />
               </div>
               <div className="h-[35%] min-h-[250px] border-t border-white/50 bg-white/60 backdrop-blur-md flex flex-col shrink-0">
@@ -599,7 +603,7 @@ function MainApp({ user, signOut, onShowLanding }) {
             </div>
             
             <div className={`absolute inset-0 bg-white/50 backdrop-blur-md ${activeRightTab === 'whiteboard' ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}>
-                <Whiteboard roomId={roomId} socket={socket} user={userIdentity} />
+                <Whiteboard roomId={roomId} socket={socket} user={userIdentity} isRoomSynced={isRoomSynced} />
             </div>
           </div>
         </div>
