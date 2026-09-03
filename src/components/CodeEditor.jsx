@@ -47,6 +47,9 @@ export default function CodeEditor({
     const lastSnippetRef = useRef(null);
     const changeDebounceTimer = useRef(null);
     const hasRoomCodeInitialized = useRef(false);
+    const initialCodeRef = useRef(null);
+
+    const [isEditorMounted, setIsEditorMounted] = useState(false);
 
     // Keep always-fresh references to props so callbacks never suffer from stale closures
     const socketRef = useRef(socket);
@@ -66,6 +69,15 @@ export default function CodeEditor({
         if (externalEditorRef) {
             externalEditorRef.current = editor;
         }
+
+        if (initialCodeRef.current !== null) {
+            isRemoteChange.current = true;
+            editor.setValue(initialCodeRef.current);
+            isRemoteChange.current = false;
+            initialCodeRef.current = null;
+        }
+
+        setIsEditorMounted(true);
 
         // Configure Monaco theme for modern light glassmorphic mode
         monaco.editor.defineTheme('codecollab-light', {
@@ -169,6 +181,8 @@ export default function CodeEditor({
                     isRemoteChange.current = true;
                     editorRef.current.setValue(data.code);
                     isRemoteChange.current = false;
+                } else {
+                    initialCodeRef.current = data.code;
                 }
                 const slug = data?.problem?.titleSlug || problem?.titleSlug || 'custom';
                 lastSnippetRef.current = `${slug}-${data.language || language}`;
@@ -212,7 +226,7 @@ export default function CodeEditor({
 
     // Handle boilerplate snippet insertion when problem or language changes
     useEffect(() => {
-        if (!editorRef.current || !isRoomSynced) return;
+        if (!isEditorMounted || !editorRef.current || !isRoomSynced) return;
 
         let newCode = null;
         const snippetKey = `${problem?.titleSlug || 'custom'}-${language}`;
@@ -263,7 +277,7 @@ export default function CodeEditor({
             // Even if the code is identical, update the ref so we don't keep trying
             lastSnippetRef.current = snippetKey;
         }
-    }, [problem, language, isRoomSynced]);
+    }, [problem, language, isRoomSynced, isEditorMounted]);
 
     return (
         <div className="flex-1 w-full relative h-full">
