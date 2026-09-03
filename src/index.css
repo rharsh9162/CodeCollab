@@ -1,0 +1,95 @@
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: #EDF2F7; /* Soft atmospheric tint */
+    --surface: rgba(255, 255, 255, 0.65);
+    --surface-hover: rgba(255, 255, 255, 0.85);
+    --border: rgba(255, 255, 255, 0.7); 
+    --border-strong: rgba(255, 255, 255, 0.9);
+    
+    --primary: #2563EB;
+    --primary-hover: #1D4ED8;
+    --secondary: #06B6D4; /* Cyan accent to complement blue */
+    --secondary-hover: #0891B2;
+    
+    --text-main: #0F172A; /* Slate 900 for high contrast on glass */
+    --text-muted: #475569; /* Slate 600 */
+    --text-subtle: #94A3B8; /* Slate 400 */
+    
+    --success: #10B981;
+    --warning: #F59E0B;
+    --danger: #EF4444;
+  }
+
+  body {
+    @apply bg-background text-text-main font-sans antialiased overflow-hidden;
+    font-family: 'Geist', sans-serif;
+  }
+
+  /* Custom scrollbar for glass UI */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-slate-400/40 rounded-full;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    @apply bg-slate-500/70;
+  }
+}
+
+@layer components {
+  /* Dynamic Glass Background */
+  .glass-body-bg {
+    @apply fixed inset-0 z-[-1] overflow-hidden pointer-events-none bg-gradient-to-br from-[#EEF2F6] via-[#E9EEF5] to-[#E2E8F0];
+  }
+  .glass-blob-1 {
+    @apply absolute top-[-15%] left-[-10%] w-[60vw] h-[60vw] bg-blue-400/25 rounded-full blur-[130px] mix-blend-multiply pointer-events-none animate-pulse-slow;
+  }
+  .glass-blob-2 {
+    @apply absolute bottom-[-15%] right-[-10%] w-[60vw] h-[60vw] bg-cyan-400/20 rounded-full blur-[140px] mix-blend-multiply pointer-events-none;
+    animation: pulse-slow 8s infinite alternate-reverse;
+  }
+
+  /* Core Glass Panel */
+  .glass-panel {
+    @apply bg-white/75 backdrop-blur-2xl border border-white/80 shadow-[0_12px_36px_-10px_rgba(15,23,42,0.07)] rounded-2xl relative overflow-hidden;
+  }
+
+  /* Crisp Soft UI Button */
+  .btn-primary {
+    @apply inline-flex items-center justify-center rounded-xl bg-primary text-white font-semibold transition-all duration-300 shadow-[0_4px_14px_0_rgba(37,99,235,0.39)] hover:shadow-[0_6px_20px_rgba(37,99,235,0.23)] hover:-translate-y-[1px] active:translate-y-[1px] active:shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2;
+  }
+  
+  .btn-secondary {
+    @apply inline-flex items-center justify-center rounded-xl bg-white/70 backdrop-blur-md border border-white/80 shadow-sm text-text-main font-semibold transition-all duration-300 hover:bg-white/90 hover:shadow-md hover:-translate-y-[1px] active:translate-y-[1px] focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2;
+  }
+  
+  .btn-ghost {
+    @apply inline-flex items-center justify-center rounded-xl bg-transparent text-text-muted font-medium transition-all duration-300 hover:bg-white/50 hover:text-text-main active:bg-white/70 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2;
+  }
+
+  /* Modern input fields */
+  .input-field {
+    @apply w-full rounded-xl border border-white/60 bg-white/50 backdrop-blur-sm px-4 py-2.5 text-sm font-medium text-text-main transition-all placeholder:text-text-subtle focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary focus:bg-white/80 shadow-inner shadow-black/[0.01];
+  }
+
+  /* Crisp header */
+  .glass-header {
+    @apply h-14 border-b border-white/50 bg-white/60 backdrop-blur-xl flex items-center px-4 shrink-0 z-10;
+  }
+
+  /* Resizer handle */
+  .resizer {
+    @apply w-1.5 mx-1 my-4 bg-slate-200/50 hover:bg-primary rounded-full cursor-col-resize transition-colors shrink-0 z-20 backdrop-blur-sm;
+  }
+}
