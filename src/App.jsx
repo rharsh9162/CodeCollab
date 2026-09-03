@@ -16,6 +16,8 @@ import {
   wrapWithDriver,
 } from './utils/codeDriver';
 import { Toaster, toast } from "sonner";
+import { getSocket } from './services/socket';
+import { getProblemDetail, searchLeetCodeProblems, runCodeExecution } from './services/api';
 
 function generateRoomId() {
   return crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
@@ -133,7 +135,7 @@ function MainApp({ user, signOut, onShowLanding }) {
   const [executionResults, setExecutionResults] = useState([]);
   const [isRunning, setIsRunning] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [roomWs, setRoomWs] = useState(null);
+  const [socket, setSocket] = useState(null);
   const editorRef = useRef(null);
   const problemLoadedRef = useRef(false);
 
@@ -143,7 +145,7 @@ function MainApp({ user, signOut, onShowLanding }) {
   const userIdentity = useMemo(() => ({
     userId: user?.uid || 'user-' + Math.random().toString(36).slice(2, 6),
     userName: user?.displayName || user?.email?.split('@')[0] || 'User',
-    userColor: user?.userColor || '#2563EB',
+    userColor: user?.userColor || (user?.uid ? colorFromUid(user.uid) : '#2563EB'),
     email: user?.email || '',
     photoURL: user?.photoURL || null,
   }), [user]);
@@ -168,30 +170,63 @@ function MainApp({ user, signOut, onShowLanding }) {
     }
   }, []);
 
-  const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-  const DEFAULT_API_URL = isLocal ? '' : 'https://codecollab-backend-a4w0.onrender.com';
-  const DEFAULT_WS_URL = isLocal ? `ws://${window.location.hostname}:3001` : 'wss://codecollab-backend-a4w0.onrender.com';
+  // Connect & join room via Socket.io
+  useEffect(() => {
+    const s = getSocket();
+    setSocket(s);
 
-  const API_BASE = import.meta.env.VITE_API_URL || DEFAULT_API_URL;
-  const WS_BASE = import.meta.env.VITE_WS_URL || DEFAULT_WS_URL;
+    const onConnect = () => {
+      s.emit('room:join', { roomId, user: userIdentity });
+    };
+
+    const onProblemUpdate = (remoteProblem) => {
+      if (remoteProblem) {
+        setProblem(remoteProblem);
+      }
+    };
+
+    const onRoomInit = (data) => {
+      if (data?.problem) {
+        setProblem(data.problem);
+      }
+      if (data?.language) {
+        setLanguage(data.language);
+      }
+    };
+
+    s.on('connect', onConnect);
+    s.on('problem:update', onProblemUpdate);
+    s.on('room:init', onRoomInit);
+
+    if (s.connected) {
+      onConnect();
+    }
+
+    return () => {
+      s.off('connect', onConnect);
+      s.off('problem:update', onProblemUpdate);
+      s.off('room:init', onRoomInit);
+    };
+  }, [roomId, userIdentity]);
 
   const handleImport = useCallback(async (slug) => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/problem/${encodeURIComponent(slug)}`);
-      const data = await res.json();
-      if (data.error) {
-        addToast(`Error: ${data.error}`, 'error');
-      } else {
-        setProblem(data);
-        addToast(`Loaded: ${data.title}`, 'success');
+      const data = await getProblemDetail(slug);
+      setProblem(data);
+      addToast(`Loaded: ${data.title}`, 'success');
+
+      // Synchronize problem with all collaborators in room
+      const s = getSocket();
+      if (s?.connected) {
+        s.emit('problem:sync', { roomId, problem: data });
       }
-    } catch {
-      addToast('Failed to fetch problem. Make sure the backend server is running.', 'error');
+    } catch (err) {
+      addToast(err.message || 'Failed to fetch problem from LeetCode', 'error');
     } finally {
       setLoading(false);
     }
-  }, [addToast, API_BASE]);
+  }, [addToast, roomId]);
 
   // Auto-load problem from URL on mount
   useEffect(() => {
@@ -205,39 +240,15 @@ function MainApp({ user, signOut, onShowLanding }) {
   const handleSearch = useCallback(async (query) => {
     setSearchLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/search/${encodeURIComponent(query)}`);
-      const data = await res.json();
-      if (data.questions) setSearchResults(data.questions);
-      else setSearchResults([]);
-    } catch {
+      const questions = await searchLeetCodeProblems(query);
+      setSearchResults(questions || []);
+    } catch (err) {
       setSearchResults([]);
+      addToast(err.message || 'Failed to search problems', 'error');
     } finally {
       setSearchLoading(false);
     }
-  }, [API_BASE]);
-
-  // Connect to Room WebSocket for chat, whiteboard, and voice
-  useEffect(() => {
-    const wsUrl = `${WS_BASE}/room?room=${roomId}&userId=${encodeURIComponent(userIdentity.userId)}&userName=${encodeURIComponent(userIdentity.userName)}&userColor=${encodeURIComponent(userIdentity.userColor)}`;
-    let ws;
-    let reconnectTimer;
-
-    function connect() {
-      ws = new WebSocket(wsUrl);
-      ws.onopen = () => setRoomWs(ws);
-      ws.onclose = () => {
-        setRoomWs(null);
-        reconnectTimer = setTimeout(connect, 2000);
-      };
-      ws.onerror = () => ws.close();
-    }
-
-    connect();
-    return () => {
-      clearTimeout(reconnectTimer);
-      ws?.close();
-    };
-  }, [roomId, userIdentity.userId, WS_BASE]);
+  }, [addToast]);
 
   const getEditorCode = useCallback(() => {
     if (editorRef.current) {
@@ -247,34 +258,11 @@ function MainApp({ user, signOut, onShowLanding }) {
   }, []);
 
   const executeCodeApi = async (code, lang, stdin = '') => {
-    const res = await fetch(`${API_BASE}/api/execute`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code, language: lang, stdin }),
-    });
-    return res.json();
+    return runCodeExecution(code, lang, stdin);
   };
 
-  const getCurrentSnippet = useCallback(() => {
-    if (!problem?.codeSnippets) return null;
-    const LANG_SLUGS = {
-      python: 'python3', javascript: 'javascript', typescript: 'typescript',
-      java: 'java', cpp: 'cpp', c: 'c', csharp: 'csharp', go: 'golang',
-      rust: 'rust', ruby: 'ruby', swift: 'swift', kotlin: 'kotlin',
-    };
-    const slug = LANG_SLUGS[language];
-    return problem.codeSnippets.find(
-      (s) => s.langSlug === slug || s.lang.toLowerCase().includes(language)
-    )?.code || null;
-  }, [problem, language]);
-
   const executeForTestCase = async (code, lang, stdin) => {
-    const res = await fetch('/api/execute', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code, language: lang, stdin }),
-    });
-    return res.json();
+    return runCodeExecution(code, lang, stdin);
   };
 
   const handleRunCode = useCallback(async () => {
@@ -419,7 +407,15 @@ function MainApp({ user, signOut, onShowLanding }) {
           <div className="flex flex-1 flex-col overflow-hidden relative bg-white/20">
             <div className={`absolute inset-0 flex flex-col ${activeRightTab === 'editor' ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}>
               <div className="flex-1 bg-white/50 backdrop-blur-md">
-                <CodeEditor roomId={roomId} problem={problem} language={language} onLanguageChange={setLanguage} editorRef={editorRef} />
+                <CodeEditor 
+                  socket={socket} 
+                  roomId={roomId} 
+                  problem={problem} 
+                  language={language} 
+                  onLanguageChange={setLanguage} 
+                  editorRef={editorRef} 
+                  userId={userIdentity.userId} 
+                />
               </div>
               <div className="h-[35%] min-h-[250px] border-t border-white/50 bg-white/60 backdrop-blur-md flex flex-col shrink-0">
                   <TestCases problem={problem} executionResults={executionResults} isRunning={isRunning} language={language} />
@@ -427,13 +423,14 @@ function MainApp({ user, signOut, onShowLanding }) {
             </div>
             
             <div className={`absolute inset-0 bg-white/50 backdrop-blur-md ${activeRightTab === 'whiteboard' ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}>
-                <Whiteboard roomId={roomId} roomWs={roomWs} />
+                <Whiteboard roomId={roomId} socket={socket} />
             </div>
           </div>
         </div>
 
         <ChatSidebar
-          roomWs={roomWs}
+          socket={socket}
+          roomId={roomId}
           isOpen={sidebarOpen}
           onToggle={() => setSidebarOpen(!sidebarOpen)}
           userId={userIdentity.userId}

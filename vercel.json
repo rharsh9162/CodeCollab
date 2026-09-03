@@ -8,6 +8,10 @@
       "destination": "https://codecollab-backend-a4w0.onrender.com/api/:path*"
     },
     {
+      "source": "/socket.io/:path*",
+      "destination": "https://codecollab-backend-a4w0.onrender.com/socket.io/:path*"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

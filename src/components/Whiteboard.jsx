@@ -7,7 +7,7 @@ const ExcalidrawComponent = lazy(() =>
     }))
 );
 
-export default function Whiteboard({ roomId, roomWs }) {
+export default function Whiteboard({ roomId, socket }) {
     const [excalidrawAPI, setExcalidrawAPI] = useState(null);
     const isRemoteUpdate = useRef(false);
     const lastSentElements = useRef(null);
@@ -15,35 +15,30 @@ export default function Whiteboard({ roomId, roomWs }) {
 
     // Listen for remote whiteboard updates
     useEffect(() => {
-        if (!roomWs || !excalidrawAPI) return;
+        if (!socket || !excalidrawAPI) return;
 
-        const handleMessage = (event) => {
-            try {
-                const data = JSON.parse(event.data);
-                if (data.type === 'whiteboard-update') {
-                    isRemoteUpdate.current = true;
-                    excalidrawAPI.updateScene({
-                        elements: data.elements,
-                    });
-                    // Reset flag after update is processed
-                    setTimeout(() => { isRemoteUpdate.current = false; }, 50);
-                }
-            } catch { /* ignore */ }
+        const handleUpdate = (data) => {
+            if (!data || !data.elements) return;
+            isRemoteUpdate.current = true;
+            excalidrawAPI.updateScene({
+                elements: data.elements,
+            });
+            setTimeout(() => { isRemoteUpdate.current = false; }, 50);
         };
 
-        roomWs.addEventListener('message', handleMessage);
-        return () => roomWs.removeEventListener('message', handleMessage);
-    }, [roomWs, excalidrawAPI]);
+        socket.on('whiteboard:update', handleUpdate);
+        return () => socket.off('whiteboard:update', handleUpdate);
+    }, [socket, excalidrawAPI]);
 
     // Send local changes to room (throttled)
     const handleChange = useCallback((elements, appState) => {
-        if (isRemoteUpdate.current || !roomWs || roomWs.readyState !== 1) return;
+        if (isRemoteUpdate.current || !socket?.connected) return;
 
-        // Throttle: send at most every 100ms
+        // Throttle: send at most every 80ms
         if (throttleTimer.current) return;
         throttleTimer.current = setTimeout(() => {
             throttleTimer.current = null;
-        }, 100);
+        }, 80);
 
         // Only send if elements actually changed
         const serialized = JSON.stringify(elements.map(e => ({
@@ -53,14 +48,14 @@ export default function Whiteboard({ roomId, roomWs }) {
         if (serialized === lastSentElements.current) return;
         lastSentElements.current = serialized;
 
-        roomWs.send(JSON.stringify({
-            type: 'whiteboard-update',
-            elements: elements,
+        socket.emit('whiteboard:update', {
+            roomId,
+            elements,
             appState: {
                 viewBackgroundColor: appState.viewBackgroundColor,
             },
-        }));
-    }, [roomWs]);
+        });
+    }, [socket, roomId]);
 
     return (
         <div className="flex-1 relative w-full h-full bg-background">

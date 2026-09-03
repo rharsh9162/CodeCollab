@@ -1,8 +1,5 @@
-import { useRef, useEffect, useState, useCallback } from 'react';
+import { useRef, useEffect, useCallback } from 'react';
 import Editor from '@monaco-editor/react';
-import * as Y from 'yjs';
-import { MonacoBinding } from 'y-monaco';
-import { WebsocketProvider } from 'y-websocket';
 
 const LANGUAGES = [
     { label: 'Python 3', value: 'python', slug: 'python3' },
@@ -19,38 +16,30 @@ const LANGUAGES = [
     { label: 'Kotlin', value: 'kotlin', slug: 'kotlin' },
 ];
 
-const USER_COLORS = [
-    '#6c63ff', '#a855f7', '#ec4899', '#f43f5e',
-    '#f97316', '#eab308', '#22c55e', '#06b6d4',
-    '#3b82f6', '#8b5cf6', '#d946ef', '#14b8a6',
-];
-
-function getRandomColor() {
-    return USER_COLORS[Math.floor(Math.random() * USER_COLORS.length)];
-}
-
-function getRandomName() {
-    const adjectives = ['Swift', 'Clever', 'Bold', 'Calm', 'Sharp', 'Bright'];
-    const nouns = ['Coder', 'Dev', 'Hacker', 'Builder', 'Architect', 'Wizard'];
-    return `${adjectives[Math.floor(Math.random() * adjectives.length)]}${nouns[Math.floor(Math.random() * nouns.length)]}`;
-}
-
-export default function CodeEditor({ roomId, problem, language, onLanguageChange, editorRef: externalEditorRef }) {
+export default function CodeEditor({ 
+    socket,
+    roomId, 
+    problem, 
+    language, 
+    onLanguageChange, 
+    editorRef: externalEditorRef,
+    userId,
+}) {
     const editorRef = useRef(null);
-    const providerRef = useRef(null);
-    const bindingRef = useRef(null);
-    const ydocRef = useRef(null);
-    const [connected, setConnected] = useState(false);
-    const userInfo = useRef({ name: getRandomName(), color: getRandomColor() });
+    const monacoRef = useRef(null);
+    const isRemoteChange = useRef(false);
+    const lastSnippetRef = useRef(null);
+    const changeDebounceTimer = useRef(null);
 
     const handleEditorDidMount = useCallback((editor, monaco) => {
         editorRef.current = editor;
-        // Expose editor to parent via external ref
+        monacoRef.current = monaco;
+
         if (externalEditorRef) {
             externalEditorRef.current = editor;
         }
 
-        // Configure Monaco theme for light SaaS mode
+        // Configure Monaco theme for modern light glassmorphic mode
         monaco.editor.defineTheme('codecollab-light', {
             base: 'vs',
             inherit: true,
@@ -90,86 +79,105 @@ export default function CodeEditor({ roomId, problem, language, onLanguageChange
         });
         monaco.editor.setTheme('codecollab-light');
 
-        // Setup EOL to LF to prevent Windows \r\n offset mismatches
-        editor.getModel().setEOL(monaco.editor.EndOfLineSequence.LF);
+        // Setup EOL to LF to prevent character offset mismatches
+        editor.getModel()?.setEOL(monaco.editor.EndOfLineSequence.LF);
 
-        // Setup Yjs collaboration
-        setupCollaboration(editor, monaco);
-    }, [roomId]);
+        // Listen for local text edits and emit via Socket.io
+        const disposable = editor.onDidChangeModelContent(() => {
+            if (isRemoteChange.current || !socket?.connected) return;
 
-    const setupCollaboration = (editor, monaco) => {
-        // Clean up existing connections
-        if (bindingRef.current) bindingRef.current.destroy();
-        if (providerRef.current) providerRef.current.destroy();
-        if (ydocRef.current) ydocRef.current.destroy();
+            const currentCode = editor.getValue();
 
-        const ydoc = new Y.Doc();
-        ydocRef.current = ydoc;
-
-        const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-        const defaultWs = isLocal ? `ws://${window.location.hostname}:3001` : 'wss://codecollab-backend-a4w0.onrender.com';
-        const wsUrl = import.meta.env.VITE_WS_URL || defaultWs;
-        const provider = new WebsocketProvider(wsUrl, `codecollab-${roomId}`, ydoc);
-        providerRef.current = provider;
-
-        provider.on('status', ({ status }) => {
-            setConnected(status === 'connected');
+            // Slightly debounce emit to optimize network throughput (50ms)
+            clearTimeout(changeDebounceTimer.current);
+            changeDebounceTimer.current = setTimeout(() => {
+                socket.emit('code:change', {
+                    roomId,
+                    code: currentCode,
+                    language,
+                });
+            }, 50);
         });
 
-        // Set awareness (user presence)
-        provider.awareness.setLocalStateField('user', {
-            name: userInfo.current.name,
-            color: userInfo.current.color,
-        });
+        return () => disposable.dispose();
+    }, [socket, roomId, language, externalEditorRef]);
 
-        const ytext = ydoc.getText('monaco');
-
-        const binding = new MonacoBinding(
-            ytext,
-            editor.getModel(),
-            new Set([editor]),
-            provider.awareness
-        );
-        bindingRef.current = binding;
-    };
-
-    // Set initial code from problem snippets when problem or language changes
-    const lastSnippetRef = useRef(null);
-
+    // Listen for remote code updates and room init
     useEffect(() => {
-        if (problem && problem.codeSnippets && editorRef.current && ydocRef.current) {
+        if (!socket) return;
+
+        const onRoomInit = (data) => {
+            if (editorRef.current && data?.code && data.code.trim()) {
+                isRemoteChange.current = true;
+                editorRef.current.setValue(data.code);
+                isRemoteChange.current = false;
+            }
+            if (data?.language && data.language !== language && onLanguageChange) {
+                onLanguageChange(data.language);
+            }
+        };
+
+        const onCodeUpdate = (data) => {
+            if (!editorRef.current || !data) return;
+            if (data.updatedBy === userId) return;
+
+            const editor = editorRef.current;
+            const currentVal = editor.getValue();
+            if (currentVal === data.code) return;
+
+            const pos = editor.getPosition();
+            const scrollTop = editor.getScrollTop();
+
+            isRemoteChange.current = true;
+            editor.setValue(data.code);
+            if (pos) editor.setPosition(pos);
+            editor.setScrollTop(scrollTop);
+            isRemoteChange.current = false;
+
+            if (data.language && data.language !== language && onLanguageChange) {
+                onLanguageChange(data.language);
+            }
+        };
+
+        socket.on('room:init', onRoomInit);
+        socket.on('code:update', onCodeUpdate);
+
+        return () => {
+            socket.off('room:init', onRoomInit);
+            socket.off('code:update', onCodeUpdate);
+        };
+    }, [socket, userId, language, onLanguageChange]);
+
+    // Handle initial boilerplate snippet insertion when problem or language changes
+    useEffect(() => {
+        if (problem?.codeSnippets && editorRef.current) {
             const lang = LANGUAGES.find((l) => l.value === language);
             const snippet = problem.codeSnippets.find(
                 (s) => s.langSlug === lang?.slug || s.lang.toLowerCase().includes(language)
             );
+
             if (snippet) {
-                // Build a key to track if we already inserted this exact snippet
                 const snippetKey = `${problem.titleSlug || 'custom'}-${language}`;
                 if (lastSnippetRef.current !== snippetKey) {
                     lastSnippetRef.current = snippetKey;
-                    const ytext = ydocRef.current.getText('monaco');
                     const cleanCode = snippet.code.replace(/\r\n/g, '\n').trimEnd() + '\n';
                     
-                    // Atomically clear and reset without trigger cascade
-                    ydocRef.current.transact(() => {
-                        const currentLen = ytext.length;
-                        if (currentLen > 0) {
-                            ytext.delete(0, currentLen);
-                        }
-                        ytext.insert(0, cleanCode);
-                    });
+                    isRemoteChange.current = true;
+                    editorRef.current.setValue(cleanCode);
+                    isRemoteChange.current = false;
+
+                    // Broadcast new snippet to room
+                    if (socket?.connected) {
+                        socket.emit('code:change', {
+                            roomId,
+                            code: cleanCode,
+                            language,
+                        });
+                    }
                 }
             }
         }
-    }, [problem, language]);
-
-    useEffect(() => {
-        return () => {
-            if (bindingRef.current) bindingRef.current.destroy();
-            if (providerRef.current) providerRef.current.destroy();
-            if (ydocRef.current) ydocRef.current.destroy();
-        };
-    }, []);
+    }, [problem, language, socket, roomId]);
 
     return (
         <div className="flex-1 w-full relative h-full">
